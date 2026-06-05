@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: command-center-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: command-center-role
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["events", "pods", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: command-center-rb
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: command-center-sa
+    namespace: default
+roleRef:
+  kind: Role
+  name: command-center-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Target App: payment-api
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: default
+  labels:
+    app: payment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - name: payment-api
+          image: payment-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+              name: http
+          resources:
+            requests:
+              memory: "80Mi"
+              cpu: "50m"
+            limits:
+              memory: "200Mi"
+              cpu: "300m"
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://opentelemetry-collector.observability.svc.cluster.local:4318/v1/traces"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api-service
+  namespace: default
+  labels:
+    app: payment-api
+spec:
+  ports:
+    - port: 5000
+      targetPort: 5000
+      name: http
+  selector:
+    app: payment-api
+---
+# ServiceMonitor to scrape payment-api metrics via Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-api-monitor
+  namespace: default
+  labels:
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app: payment-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 5s
+---
+# AIOps Command Center
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: command-center
+  namespace: default
+  labels:
+    app: command-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: command-center
+  template:
+    metadata:
+      labels:
+        app: command-center
+    spec:
+      serviceAccountName: command-center-sa
+      containers:
+        - name: command-center
+          image: command-center:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              memory: "60Mi"
+              cpu: "30m"
+            limits:
+              memory: "150Mi"
+              cpu: "200m"
+          env:
+            - name: PROMETHEUS_URL
+              value: "http://prometheus-operator-kube-p-prometheus.observability.svc.cluster.local:9090"
+            - name: LOKI_URL
+              value: "http://loki.observability.svc.cluster.local:3100"
+            - name: TEMPO_URL
+              value: "http://tempo.observability.svc.cluster.local:3200"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-secret
+                  key: api-key
+            - name: GEMINI_MODEL
+              value: "gemini-3.1-flash-lite"
+            - name: TARGET_SERVICE_URL
+              value: "http://payment-api-service.default.svc.cluster.local:5000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: command-center-service
+  namespace: default
+  labels:
+    app: command-center
+spec:
+  type: NodePort
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 32009
+      name: http
+  selector:
+    app: command-center

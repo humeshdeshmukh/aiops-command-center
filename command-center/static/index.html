@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIOps Command Center</title>
+    <!-- Modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- CSS stylesheet link -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Marked.js library for rendering markdown from AI response -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Dashboard Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-container">
+                    <i class="fa-solid fa-brain logo-icon"></i>
+                </div>
+                <div>
+                    <h1>Aegis AIOps Command Center</h1>
+                    <p class="subtitle">AI-Driven Kubernetes Operations & Troubleshooting</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator">
+                    <span class="pulse-dot green" id="cluster-pulse"></span>
+                    <span class="status-text" id="cluster-status-text">Connecting to cluster...</span>
+                </div>
+                <button class="remediate-btn" id="global-remediate-btn" title="Reset state to healthy and trigger rolling restart">
+                    <i class="fa-solid fa-screwdriver-wrench"></i> Auto-Remediate
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Layout -->
+        <div class="dashboard-grid">
+            <!-- Left Side: Control & Console -->
+            <div class="left-panel">
+                
+                <!-- System Health Gauges -->
+                <section class="card health-section">
+                    <h2 class="card-title"><i class="fa-solid fa-heart-pulse"></i> Telemetry Gauges</h2>
+                    <div class="gauges-grid">
+                        <div class="gauge-card">
+                            <span class="gauge-label">Pod Status</span>
+                            <span class="gauge-value" id="gauge-pod-status">-</span>
+                        </div>
+                        <div class="gauge-card">
+                            <span class="gauge-label">Restarts</span>
+                            <span class="gauge-value" id="gauge-restarts">-</span>
+                        </div>
+                        <div class="gauge-card">
+                            <span class="gauge-label">Active Mode</span>
+                            <span class="gauge-value" id="gauge-active-mode">-</span>
+                        </div>
+                        <div class="gauge-card">
+                            <span class="gauge-label">Avg Latency</span>
+                            <span class="gauge-value" id="gauge-latency">-</span>
+                        </div>
+                        <div class="gauge-card">
+                            <span class="gauge-label">Error Rate</span>
+                            <span class="gauge-value" id="gauge-error-rate">-</span>
+                        </div>
+                        <div class="gauge-card">
+                            <span class="gauge-label">RAM Scraped</span>
+                            <span class="gauge-value" id="gauge-memory">-</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Incident Control Panel -->
+                <section class="card incident-card">
+                    <h2 class="card-title"><i class="fa-solid fa-bolt"></i> Incident Simulation Panel</h2>
+                    <p class="card-desc">Simulate production failure scenarios to evaluate AI root cause analysis.</p>
+                    <div class="sim-controls">
+                        <button class="sim-btn healthy active" data-mode="healthy">
+                            <i class="fa-solid fa-circle-check"></i> Reset (Healthy)
+                        </button>
+                        <button class="sim-btn warning" data-mode="slowdown">
+                            <i class="fa-solid fa-clock"></i> Slowdown (Latency)
+                        </button>
+                        <button class="sim-btn danger" data-mode="db_error">
+                            <i class="fa-solid fa-database"></i> DB Conn Timeout
+                        </button>
+                        <button class="sim-btn danger" data-mode="memory_leak">
+                            <i class="fa-solid fa-microchip"></i> Memory Leak (OOM)
+                        </button>
+                        <button class="sim-btn critical" data-mode="crash">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Pod Crash Loop
+                        </button>
+                    </div>
+                </section>
+
+                <!-- AI Console Query Interface -->
+                <section class="card query-card">
+                    <h2 class="card-title"><i class="fa-solid fa-terminal"></i> Ask Antigravity AIOps Agent</h2>
+                    <div class="preset-queries">
+                        <span class="preset-tag">Why is service down?</span>
+                        <span class="preset-tag">Analyze current metrics</span>
+                        <span class="preset-tag">Check error logs</span>
+                        <span class="preset-tag">Show troubleshooting help</span>
+                    </div>
+                    <form id="ai-query-form" class="query-form">
+                        <input type="text" id="query-input" placeholder="e.g. Why is payment-api service down?" required autocomplete="off">
+                        <button type="submit" class="send-btn" id="query-submit-btn">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </section>
+
+            </div>
+
+            <!-- Right Side: AI Diagnosis & Telemetry tabs -->
+            <div class="right-panel">
+                
+                <!-- AI Analysis Card -->
+                <section class="card analysis-card">
+                    <div class="analysis-header">
+                        <h2 class="card-title"><i class="fa-solid fa-robot"></i> AI Root Cause Analysis</h2>
+                        <span class="ai-badge">gemini-3.1-flash-lite</span>
+                    </div>
+                    
+                    <div class="analysis-body" id="analysis-output">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-chart-line empty-icon"></i>
+                            <p>Ask a question or select a simulation mode to begin SRE diagnosis.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-loader" id="analysis-loader" style="display: none;">
+                        <div class="loader-spinner"></div>
+                        <p>AIOps Agent aggregating metrics, logs, traces, and Kubernetes events...</p>
+                        <p class="loader-sub">Invoking Gemini 3.1 Flash Lite model for incident diagnosis...</p>
+                    </div>
+                </section>
+
+                <!-- Detailed Telemetry Tabs -->
+                <section class="card telemetry-card">
+                    <div class="tab-header">
+                        <button class="tab-link active" data-tab="metrics-tab">
+                            <i class="fa-solid fa-chart-area"></i> Metrics
+                        </button>
+                        <button class="tab-link" data-tab="logs-tab">
+                            <i class="fa-solid fa-align-left"></i> Loki Logs
+                        </button>
+                        <button class="tab-link" data-tab="traces-tab">
+                            <i class="fa-solid fa-route"></i> Tempo Traces
+                        </button>
+                        <button class="tab-link" data-tab="events-tab">
+                            <i class="fa-solid fa-list-check"></i> K8s Events
+                        </button>
+                    </div>
+
+                    <div class="tab-content active" id="metrics-tab">
+                        <div class="charts-container">
+                            <div class="chart-wrapper">
+                                <h3>HTTP Request Rate & Latency</h3>
+                                <canvas id="chart-requests"></canvas>
+                            </div>
+                            <div class="chart-wrapper">
+                                <h3>Resource Usages (Memory / CPU)</h3>
+                                <canvas id="chart-resources"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="logs-tab">
+                        <div class="logs-console-wrapper">
+                            <div class="console-actions">
+                                <span class="console-title"><i class="fa-solid fa-terminal"></i> Loki Console (Stdout Scraped)</span>
+                                <input type="text" id="log-filter" placeholder="Filter logs (e.g. error, timeout)">
+                            </div>
+                            <pre class="logs-console" id="logs-container">Loading log streaming...</pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="traces-tab">
+                        <div class="trace-wrapper">
+                            <h3>Distributed Traces (Tempo / OTel spans)</h3>
+                            <div class="trace-timeline" id="trace-container">
+                                <!-- Traces Gantt items will populate here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="events-tab">
+                        <div class="events-table-wrapper">
+                            <table class="events-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Reason</th>
+                                        <th>Object</th>
+                                        <th>Message</th>
+                                        <th>Count</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="events-container">
+                                    <tr>
+                                        <td colspan="6" class="text-center">Loading cluster events...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
